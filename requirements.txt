@@ -11,8 +11,12 @@ openai>=1.12.0
 
 # Option 2: Hugging Face (free - choose one)
 # For local models (requires more RAM/VRAM):
-# transformers>=4.35.0
-# torch>=2.0.0
+transformers>=4.35.0
+torch>=2.0.0
 # For Inference API only (lighter, free tier available):
 # (no additional packages needed, just set HUGGINGFACE_API_TOKEN)
+
+# Web interface
+flask>=3.0.0
+flask-cors>=4.0.0
 

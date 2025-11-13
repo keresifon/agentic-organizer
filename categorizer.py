@@ -181,15 +181,34 @@ class FileCategorizer:
         with open(prefs_file, 'w') as f:
             json.dump(self.preferences, f, indent=2)
     
-    def categorize_files(self, files: List[FileInfo], batch_size: int = 20) -> Dict[FileInfo, Dict]:
-        """Categorize a list of files using LLM"""
+    def categorize_files(self, files: List[FileInfo], batch_size: int = 20, progress_callback=None) -> Dict[FileInfo, Dict]:
+        """Categorize a list of files using LLM
+        
+        Args:
+            files: List of files to categorize
+            batch_size: Number of files to process per batch
+            progress_callback: Optional callback function(current, total, current_file) called after each batch
+        """
         results = {}
+        total_files = len(files)
         
         # Process in batches to avoid token limits
-        for i in range(0, len(files), batch_size):
+        for i in range(0, total_files, batch_size):
             batch = files[i:i + batch_size]
+            batch_num = (i // batch_size) + 1
+            total_batches = (total_files + batch_size - 1) // batch_size
+            
+            # Update progress before processing batch
+            if progress_callback:
+                current_file = batch[0].name if batch else ""
+                progress_callback(i, total_files, f"Processing batch {batch_num}/{total_batches}: {current_file}")
+            
             batch_results = self._categorize_batch(batch)
             results.update(batch_results)
+            
+            # Update progress after processing batch
+            if progress_callback:
+                progress_callback(min(i + batch_size, total_files), total_files, f"Completed batch {batch_num}/{total_batches}")
         
         return results
     
@@ -244,7 +263,10 @@ Return a JSON object where keys are file names and values are categorization obj
             categorized = {}
             for file in files:
                 if file.name in result:
-                    categorized[file] = result[file.name]
+                    cat_data = result[file.name]
+                    # Normalize the categorization data (handle arrays, etc.)
+                    cat_data = self._normalize_categorization(cat_data)
+                    categorized[file] = cat_data
                 else:
                     # Fallback categorization
                     categorized[file] = self._fallback_categorize(file)
@@ -254,7 +276,30 @@ Return a JSON object where keys are file names and values are categorization obj
         except Exception as e:
             print(f"Error in LLM categorization: {e}")
             # Fallback to rule-based categorization
-            return {file: self._fallback_categorize(file) for file in files}
+            categorized = {}
+            for file in files:
+                categorized[file] = self._fallback_categorize(file)
+            return categorized
+    
+    def _normalize_categorization(self, cat_data: Dict) -> Dict:
+        """Normalize categorization data from LLM (handle arrays, etc.)"""
+        # Handle category as array (take first element)
+        if isinstance(cat_data.get("category"), list):
+            cat_data["category"] = cat_data["category"][0] if cat_data["category"] else "Other"
+        
+        # Handle subcategory as array (take first element)
+        if isinstance(cat_data.get("subcategory"), list):
+            cat_data["subcategory"] = cat_data["subcategory"][0] if cat_data["subcategory"] else None
+        
+        # Ensure category is a string
+        if not isinstance(cat_data.get("category"), str):
+            cat_data["category"] = str(cat_data.get("category", "Other"))
+        
+        # Ensure subcategory is string or None
+        if cat_data.get("subcategory") and not isinstance(cat_data["subcategory"], str):
+            cat_data["subcategory"] = str(cat_data["subcategory"])
+        
+        return cat_data
     
     def _categorize_with_openai(self, prompt: str) -> Dict:
         """Categorize using OpenAI API"""
@@ -333,18 +378,83 @@ Respond with only valid JSON:
             else:
                 result_text = str(result)
             
-            # Extract JSON from response
-            import re
-            json_match = re.search(r'\{.*\}', result_text, re.DOTALL)
-            if json_match:
-                return json.loads(json_match.group())
-            else:
-                # Try parsing the whole thing
-                return json.loads(result_text)
+            # Extract JSON from response using improved method
+            return self._extract_json_from_text(result_text)
         except requests.exceptions.RequestException as e:
             raise ValueError(f"API request failed: {e}")
         except json.JSONDecodeError as e:
             raise ValueError(f"Could not parse JSON from model response: {result_text[:200]}")
+    
+    def _extract_json_from_text(self, text: str) -> Dict:
+        """Extract JSON object from text, handling extra content before/after"""
+        import re
+        
+        # Remove the prompt part if it's still in the response
+        # Look for common markers that indicate the start of the response
+        markers = ['<|assistant|>', 'assistant:', 'response:']
+        for marker in markers:
+            if marker in text.lower():
+                text = text.split(marker, 1)[-1]
+        
+        # Remove markdown code blocks FIRST (before looking for braces)
+        text = re.sub(r'^```json\s*', '', text, flags=re.IGNORECASE | re.MULTILINE)
+        text = re.sub(r'^```\s*', '', text, flags=re.MULTILINE)
+        text = re.sub(r'```\s*$', '', text, flags=re.MULTILINE)
+        text = text.strip()
+        
+        # Try to find JSON object by finding matching braces
+        # Start from the first {
+        start_idx = text.find('{')
+        if start_idx == -1:
+            raise ValueError("No JSON object found in response")
+        
+        # Find the matching closing brace
+        brace_count = 0
+        end_idx = start_idx
+        
+        for i in range(start_idx, len(text)):
+            if text[i] == '{':
+                brace_count += 1
+            elif text[i] == '}':
+                brace_count -= 1
+                if brace_count == 0:
+                    end_idx = i + 1
+                    break
+        
+        if brace_count != 0:
+            # Unmatched braces, try regex as fallback
+            json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', text, re.DOTALL)
+            if json_match:
+                json_str = json_match.group()
+            else:
+                raise ValueError("Could not find complete JSON object")
+        else:
+            json_str = text[start_idx:end_idx]
+        
+        # Clean up the JSON string
+        json_str = json_str.strip()
+        
+        # Remove any remaining markdown code blocks
+        json_str = re.sub(r'^```json\s*', '', json_str, flags=re.IGNORECASE | re.MULTILINE)
+        json_str = re.sub(r'^```\s*', '', json_str, flags=re.MULTILINE)
+        json_str = re.sub(r'```\s*$', '', json_str, flags=re.MULTILINE)
+        json_str = json_str.strip()
+        
+        # Try to parse
+        try:
+            return json.loads(json_str)
+        except json.JSONDecodeError as e:
+            # Try to fix common issues
+            # Remove trailing commas
+            json_str = re.sub(r',\s*}', '}', json_str)
+            json_str = re.sub(r',\s*]', ']', json_str)
+            
+            try:
+                return json.loads(json_str)
+            except json.JSONDecodeError:
+                # Last resort: try to extract just the first valid JSON object more carefully
+                # Find the first complete JSON object by counting braces
+                raise ValueError(f"Could not parse JSON: {str(e)}. Text: {json_str[:200]}")
     
     def _categorize_with_hf_local(self, prompt: str) -> Dict:
         """Categorize using local Hugging Face model"""
@@ -353,13 +463,37 @@ Respond with only valid JSON:
         
         import torch
         
-        # Format prompt
-        formatted_prompt = f"""<|system|>
-You are a helpful file organization assistant. Always respond with valid JSON only.<|end|>
-<|user|>
-{prompt}
+        # Format prompt using tokenizer's chat template if available
+        system_message = "You are a helpful file organization assistant. Always respond with valid JSON only, no other text."
+        user_message = f"""{prompt}
 
-Respond with only valid JSON, no other text.<|end|>
+Respond with only valid JSON, no other text."""
+        
+        if hasattr(self.hf_tokenizer, 'apply_chat_template') and self.hf_tokenizer.chat_template:
+            # Use the tokenizer's built-in chat template (most reliable)
+            messages = [
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": user_message}
+            ]
+            formatted_prompt = self.hf_tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=True
+            )
+        elif "qwen" in self.model_name.lower():
+            # Qwen models use ChatML format
+            formatted_prompt = f"""<|im_start|>system
+{system_message}<|im_end|>
+<|im_start|>user
+{user_message}<|im_end|>
+<|im_start|>assistant
+"""
+        else:
+            # Default format for other models
+            formatted_prompt = f"""<|system|>
+{system_message}<|end|>
+<|user|>
+{user_message}<|end|>
 <|assistant|>
 """
         
@@ -382,19 +516,17 @@ Respond with only valid JSON, no other text.<|end|>
                 max_new_tokens=2000,
                 temperature=0.3,
                 do_sample=True,
-                pad_token_id=self.hf_tokenizer.eos_token_id
+                pad_token_id=self.hf_tokenizer.eos_token_id,
+                eos_token_id=self.hf_tokenizer.eos_token_id
             )
         
-        # Decode
-        result_text = self.hf_tokenizer.decode(outputs[0], skip_special_tokens=True)
+        # Decode only the new tokens (remove the prompt)
+        input_length = inputs['input_ids'].shape[1]
+        generated_tokens = outputs[0][input_length:]
+        result_text = self.hf_tokenizer.decode(generated_tokens, skip_special_tokens=True)
         
-        # Extract JSON
-        import re
-        json_match = re.search(r'\{.*\}', result_text, re.DOTALL)
-        if json_match:
-            return json.loads(json_match.group())
-        else:
-            raise ValueError(f"Could not parse JSON from model response")
+        # Extract JSON using improved method
+        return self._extract_json_from_text(result_text)
     
     def _fallback_categorize(self, file: FileInfo) -> Dict:
         """Fallback categorization based on file extension and MIME type"""

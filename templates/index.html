@@ -1,0 +1,1096 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI File Organizer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .header h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        .status-bar {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #4caf50;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.idle { background: #9e9e9e; animation: none; }
+        .status-dot.scanning { background: #2196f3; }
+        .status-dot.categorizing { background: #ff9800; }
+        .status-dot.organizing { background: #9c27b0; }
+        .status-dot.error { background: #f44336; animation: none; }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .card h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+            font-weight: 500;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+        }
+
+        .btn-success {
+            background: #28a745;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-card .number {
+            font-size: 2.5em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .stat-card .label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+
+        .file-list {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 10px;
+        }
+
+        .file-item {
+            padding: 12px;
+            border-bottom: 1px solid #f0f0f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .file-item:last-child {
+            border-bottom: none;
+        }
+
+        .file-item:hover {
+            background: #f8f9fa;
+        }
+
+        .file-name {
+            font-weight: 500;
+            color: #333;
+            flex: 1;
+        }
+
+        .file-category {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: 500;
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .category-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 10px;
+        }
+
+        .category-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .category-item .count {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .category-item .name {
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .message {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .message.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .directory-item {
+            padding: 12px;
+            border-bottom: 1px solid #f0f0f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .directory-item:hover {
+            background: #f8f9fa;
+        }
+
+        .directory-item.selected {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+        }
+
+        .directory-icon {
+            font-size: 1.5em;
+            margin-right: 10px;
+        }
+
+        .selected-dir-tag {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 15px;
+            margin: 5px;
+            font-size: 0.9em;
+            position: relative;
+        }
+
+        .selected-dir-tag .remove {
+            margin-left: 8px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .selected-dir-tag .remove:hover {
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 AI File Organizer</h1>
+            <p>Intelligently organize your files using AI-powered categorization</p>
+        </div>
+
+        <div class="status-bar">
+            <div class="status-indicator">
+                <div class="status-dot" id="statusDot"></div>
+                <span id="statusText">Initializing...</span>
+            </div>
+            <div id="statusMessage">Ready</div>
+        </div>
+
+        <!-- Progress Indicator -->
+        <div class="card" id="progressCard" style="display: none;">
+            <h2 id="progressTitle">Processing...</h2>
+            <div style="margin-bottom: 10px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                    <span id="progressText">Starting...</span>
+                    <span id="progressPercent">0%</span>
+                </div>
+                <div style="width: 100%; height: 25px; background: #e0e0e0; border-radius: 12px; overflow: hidden;">
+                    <div id="progressBar" style="height: 100%; background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); width: 0%; transition: width 0.3s ease; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 0.85em;">
+                    </div>
+                </div>
+            </div>
+            <div id="progressDetails" style="color: #666; font-size: 0.9em; margin-top: 10px;">
+                <div id="currentFile">Preparing...</div>
+                <div style="margin-top: 5px;">
+                    <span id="progressCount">0</span> / <span id="progressTotal">0</span> files
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>📁 Scan Directories</h2>
+            <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                <div style="flex: 1; min-width: 300px;">
+                    <div class="form-group">
+                        <label>Select directories to scan:</label>
+                        <button class="btn btn-secondary" onclick="showDirectoryBrowser()" style="width: 100%; margin-bottom: 10px;">
+                            📂 Browse & Select Directories
+                        </button>
+                        <div id="selectedDirectories" style="min-height: 60px; padding: 10px; background: #f8f9fa; border-radius: 8px; border: 1px solid #e0e0e0;">
+                            <div style="color: #666; font-size: 0.9em;">No directories selected. Click "Browse & Select Directories" to choose.</div>
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-top: 15px;">
+                        <label for="directories">Or enter paths manually (one per line or comma-separated):</label>
+                        <input type="text" id="directories" placeholder="Downloads, Desktop" onchange="updateSelectedDirectories()">
+                    </div>
+                </div>
+            </div>
+            <div style="margin-top: 15px;">
+                <button class="btn" onclick="initializeAgent()">Initialize</button>
+                <button class="btn btn-success" onclick="scanDirectories()">Scan Files</button>
+                <button class="btn btn-secondary" onclick="findDuplicates()">Check Duplicates</button>
+                <button class="btn btn-danger" onclick="reset()">Reset</button>
+            </div>
+        </div>
+
+        <!-- Directory Browser Modal -->
+        <div id="directoryBrowserModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; overflow-y: auto;">
+            <div style="max-width: 800px; margin: 50px auto; background: white; border-radius: 12px; padding: 25px; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2 style="margin: 0;">📂 Browse Directories</h2>
+                    <button class="btn btn-danger" onclick="hideDirectoryBrowser()" style="margin: 0;">✕ Close</button>
+                </div>
+                
+                <div style="margin-bottom: 15px;">
+                    <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                        <button class="btn btn-secondary" onclick="loadCommonDirectories()" style="flex: 1;">📋 Quick Access</button>
+                        <button class="btn btn-secondary" onclick="browseDirectory('/Volumes')" style="flex: 1;">💾 External Drives</button>
+                        <button class="btn btn-secondary" onclick="navigateToHome()" style="flex: 1;">🏠 Home</button>
+                        <button class="btn btn-secondary" onclick="navigateUp()" id="navigateUpBtn" style="flex: 1;" disabled>↑ Up</button>
+                    </div>
+                    <div style="padding: 10px; background: #f8f9fa; border-radius: 8px; font-family: monospace; font-size: 0.9em; word-break: break-all;" id="currentPath">
+                        Loading...
+                    </div>
+                </div>
+                
+                <div id="directoryBrowserContent" style="max-height: 400px; overflow-y: auto; border: 1px solid #e0e0e0; border-radius: 8px; padding: 10px;">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <div>Loading directories...</div>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;">
+                    <h3 style="margin-bottom: 10px;">Selected Directories:</h3>
+                    <div id="browserSelectedDirs" style="min-height: 50px; padding: 10px; background: #f8f9fa; border-radius: 8px; margin-bottom: 10px;">
+                        <div style="color: #666; font-size: 0.9em;">No directories selected</div>
+                    </div>
+                    <button class="btn btn-success" onclick="confirmDirectorySelection()" style="width: 100%;">✓ Use Selected Directories</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="statsContainer" class="stats" style="display: none;">
+            <div class="stat-card">
+                <div class="number" id="filesCount">0</div>
+                <div class="label">Files Found</div>
+            </div>
+            <div class="stat-card">
+                <div class="number" id="categoriesCount">0</div>
+                <div class="label">Categories</div>
+            </div>
+            <div class="stat-card">
+                <div class="number" id="duplicatesCount">0</div>
+                <div class="label">Duplicate Groups</div>
+            </div>
+        </div>
+
+        <div class="card" id="categorizeCard" style="display: none;">
+            <h2>🤖 AI Categorization</h2>
+            <p>Files have been scanned. Click to categorize them using AI.</p>
+            <button class="btn btn-success" onclick="categorizeFiles()">Categorize Files</button>
+        </div>
+
+        <div class="card" id="categoriesCard" style="display: none;">
+            <h2>📊 Categories</h2>
+            <div id="categoryGrid" class="category-grid"></div>
+        </div>
+
+        <div class="card" id="filesCard" style="display: none;">
+            <h2>📄 Files</h2>
+            <div id="fileList" class="file-list"></div>
+        </div>
+
+        <div class="card" id="organizeCard" style="display: none;">
+            <h2>🗂️ Organize Files</h2>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="organizeByDate" checked> Organize by date
+                </label>
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="organizeByProject" checked> Organize by project
+                </label>
+            </div>
+            <button class="btn btn-success" onclick="organizeFiles()">Organize Files</button>
+        </div>
+    </div>
+
+    <script>
+        let statusCheckInterval;
+        let selectedDirectories = [];
+        let browserSelectedDirs = [];
+        let currentBrowsePath = '';
+
+        // Initialize on page load
+        window.onload = function() {
+            checkStatus();
+            // Check status more frequently when processing
+            statusCheckInterval = setInterval(checkStatus, 500); // Check every 500ms for smoother updates
+            loadCommonDirectories();
+        };
+
+        function updateStatus(status, message) {
+            const statusDot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+            const statusMessage = document.getElementById('statusMessage');
+            
+            statusDot.className = 'status-dot ' + status;
+            statusText.textContent = status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ');
+            statusMessage.textContent = message;
+        }
+
+        function updateProgress(progress) {
+            const progressCard = document.getElementById('progressCard');
+            const progressBar = document.getElementById('progressBar');
+            const progressPercent = document.getElementById('progressPercent');
+            const progressText = document.getElementById('progressText');
+            const currentFile = document.getElementById('currentFile');
+            const progressCount = document.getElementById('progressCount');
+            const progressTotal = document.getElementById('progressTotal');
+            const progressTitle = document.getElementById('progressTitle');
+            
+            if (!progress || progress.phase === 'idle') {
+                progressCard.style.display = 'none';
+                return;
+            }
+            
+            progressCard.style.display = 'block';
+            
+            // Update title based on phase
+            const phaseTitles = {
+                'scanning': '🔍 Scanning Files',
+                'categorizing': '🤖 AI Categorization',
+                'organizing': '📁 Organizing Files',
+                'complete': '✅ Complete',
+                'error': '❌ Error'
+            };
+            progressTitle.textContent = phaseTitles[progress.phase] || 'Processing...';
+            
+            // Calculate percentage
+            const total = progress.total || 1;
+            const current = progress.current || 0;
+            const percent = Math.min(100, Math.round((current / total) * 100));
+            
+            // Update progress bar
+            progressBar.style.width = percent + '%';
+            progressBar.textContent = percent > 5 ? percent + '%' : '';
+            progressPercent.textContent = percent + '%';
+            
+            // Update counts
+            progressCount.textContent = current.toLocaleString();
+            progressTotal.textContent = total.toLocaleString();
+            
+            // Update current file/status
+            if (progress.current_file) {
+                // Truncate long file names
+                let fileText = progress.current_file;
+                if (fileText.length > 80) {
+                    fileText = fileText.substring(0, 77) + '...';
+                }
+                currentFile.textContent = fileText;
+            } else {
+                currentFile.textContent = getPhaseMessage(progress.phase);
+            }
+            
+            // Add estimated time remaining for large categorizations
+            if (progress.phase === 'categorizing' && progress.total > 100) {
+                const total = progress.total || 1;
+                const current = progress.current || 0;
+                if (current > 0 && current < total) {
+                    // Rough estimate: ~2-3 seconds per batch of 20 files
+                    const batchesRemaining = Math.ceil((total - current) / 20);
+                    const estimatedSeconds = batchesRemaining * 2.5;
+                    const minutes = Math.floor(estimatedSeconds / 60);
+                    const seconds = Math.floor(estimatedSeconds % 60);
+                    if (minutes > 0) {
+                        currentFile.textContent += ` | Est. time remaining: ~${minutes}m ${seconds}s`;
+                    } else if (estimatedSeconds > 10) {
+                        currentFile.textContent += ` | Est. time remaining: ~${seconds}s`;
+                    }
+                } else if (current === 0 && total > 1000) {
+                    // Show initial estimate for very large jobs
+                    const totalBatches = Math.ceil(total / 20);
+                    const estimatedMinutes = Math.ceil(totalBatches * 2.5 / 60);
+                    currentFile.textContent += ` | Estimated total time: ~${estimatedMinutes} minutes`;
+                }
+            }
+            
+            // Update progress text - use message if available for categorizing
+            if (progress.phase === 'scanning') {
+                progressText.textContent = `Scanning directories...`;
+            } else if (progress.phase === 'categorizing') {
+                // Show more detailed info during categorization
+                const total = progress.total || 1;
+                const current = progress.current || 0;
+                const batches = Math.ceil(total / 20); // Assuming batch size of 20
+                const currentBatch = Math.ceil(current / 20);
+                progressText.textContent = `Processing batch ${currentBatch}/${batches} (${current.toLocaleString()}/${total.toLocaleString()} files)`;
+            } else if (progress.phase === 'organizing') {
+                progressText.textContent = `Organizing files into folders...`;
+            } else if (progress.phase === 'complete') {
+                progressText.textContent = `Complete!`;
+            } else if (progress.phase === 'error') {
+                progressText.textContent = `Error occurred`;
+            }
+        }
+
+        function getPhaseMessage(phase) {
+            const messages = {
+                'scanning': 'Scanning files...',
+                'categorizing': 'Categorizing with AI...',
+                'organizing': 'Organizing files...',
+                'complete': 'Complete!',
+                'error': 'An error occurred'
+            };
+            return messages[phase] || 'Processing...';
+        }
+
+        async function checkStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+                updateStatus(data.status, data.message);
+                
+                // Update progress if available
+                if (data.progress) {
+                    updateProgress(data.progress);
+                }
+            } catch (error) {
+                console.error('Error checking status:', error);
+            }
+        }
+
+        async function initializeAgent() {
+            try {
+                const response = await fetch('/api/initialize', { method: 'POST' });
+                const data = await response.json();
+                alert(data.message);
+                checkStatus();
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        async function scanDirectories() {
+            // Get directories from selected list or manual input
+            updateSelectedDirectories();
+            const directoriesInput = document.getElementById('directories');
+            const manualDirs = directoriesInput.value
+                .split(/[,\n]/)
+                .map(d => d.trim())
+                .filter(d => d.length > 0);
+            
+            const directories = [...new Set([...selectedDirectories, ...manualDirs])];
+
+            if (directories.length === 0) {
+                alert('Please select or enter at least one directory');
+                return;
+            }
+
+            try {
+                // Show progress immediately
+                document.getElementById('progressCard').style.display = 'block';
+                
+                const response = await fetch('/api/scan', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ directories })
+                });
+                const data = await response.json();
+                
+                // Don't show alert, let progress bar handle it
+                // Start checking progress more frequently
+                const progressCheck = setInterval(async () => {
+                    const statusResponse = await fetch('/api/status');
+                    const statusData = await statusResponse.json();
+                    updateProgress(statusData.progress);
+                    
+                    // Stop checking when complete or error
+                    if (statusData.status === 'scanned' || statusData.status === 'error') {
+                        clearInterval(progressCheck);
+                        if (statusData.status === 'scanned') {
+                            setTimeout(loadFiles, 500);
+                        }
+                    }
+                }, 300); // Check every 300ms for real-time updates
+                
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        async function loadFiles() {
+            try {
+                const response = await fetch('/api/files');
+                const data = await response.json();
+                
+                document.getElementById('filesCount').textContent = data.count;
+                document.getElementById('statsContainer').style.display = 'grid';
+                document.getElementById('filesCard').style.display = 'block';
+                document.getElementById('categorizeCard').style.display = 'block';
+                
+                const fileList = document.getElementById('fileList');
+                fileList.innerHTML = data.files.slice(0, 50).map(file => `
+                    <div class="file-item">
+                        <div class="file-name">${file.name}</div>
+                        <div style="color: #666; margin: 0 10px;">${file.size_mb} MB</div>
+                    </div>
+                `).join('');
+                
+                if (data.count > 50) {
+                    fileList.innerHTML += `<div style="text-align: center; padding: 10px; color: #666;">... and ${data.count - 50} more files</div>`;
+                }
+            } catch (error) {
+                console.error('Error loading files:', error);
+            }
+        }
+
+        async function categorizeFiles() {
+            try {
+                // Check file count first
+                const filesResponse = await fetch('/api/files');
+                const filesData = await filesResponse.json();
+                const fileCount = filesData.count || 0;
+                
+                // Warn about large file counts
+                if (fileCount > 1000) {
+                    const estimatedMinutes = Math.ceil((fileCount / 20) * 2.5 / 60);
+                    if (!confirm(`You have ${fileCount.toLocaleString()} files to categorize.\n\nThis will take approximately ${estimatedMinutes} minutes.\n\nContinue?`)) {
+                        return;
+                    }
+                }
+                
+                // Show progress immediately
+                document.getElementById('progressCard').style.display = 'block';
+                
+                const response = await fetch('/api/categorize', { method: 'POST' });
+                const data = await response.json();
+                
+                // Monitor progress more frequently for large batches
+                const checkInterval = fileCount > 1000 ? 200 : 300;
+                const progressCheck = setInterval(async () => {
+                    const statusResponse = await fetch('/api/status');
+                    const statusData = await statusResponse.json();
+                    updateProgress(statusData.progress);
+                    
+                    // Log progress to console for debugging
+                    if (statusData.progress && statusData.progress.phase === 'categorizing') {
+                        console.log(`Categorization progress: ${statusData.progress.current}/${statusData.progress.total} (${Math.round(statusData.progress.current / statusData.progress.total * 100)}%)`);
+                    }
+                    
+                    if (statusData.status === 'categorized' || statusData.status === 'error') {
+                        clearInterval(progressCheck);
+                        if (statusData.status === 'categorized') {
+                            setTimeout(loadCategorizations, 500);
+                        }
+                    }
+                }, checkInterval);
+                
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        async function loadCategorizations() {
+            try {
+                const response = await fetch('/api/categorizations');
+                const data = await response.json();
+                
+                document.getElementById('categoriesCount').textContent = Object.keys(data.category_counts).length;
+                document.getElementById('categoriesCard').style.display = 'block';
+                document.getElementById('organizeCard').style.display = 'block';
+                
+                const categoryGrid = document.getElementById('categoryGrid');
+                categoryGrid.innerHTML = Object.entries(data.category_counts)
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([category, count]) => `
+                        <div class="category-item">
+                            <div class="count">${count}</div>
+                            <div class="name">${category}</div>
+                        </div>
+                    `).join('');
+                
+                const fileList = document.getElementById('fileList');
+                fileList.innerHTML = data.files.slice(0, 50).map(file => `
+                    <div class="file-item">
+                        <div class="file-name">${file.name}</div>
+                        <div class="file-category">${file.categorization?.category || 'Uncategorized'}</div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading categorizations:', error);
+            }
+        }
+
+        async function organizeFiles() {
+            const organizeByDate = document.getElementById('organizeByDate').checked;
+            const organizeByProject = document.getElementById('organizeByProject').checked;
+            
+            if (!confirm('This will move files to organized folders. Continue?')) {
+                return;
+            }
+
+            try {
+                // Show progress immediately
+                document.getElementById('progressCard').style.display = 'block';
+                
+                const response = await fetch('/api/organize', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        organize_by_date: organizeByDate,
+                        organize_by_project: organizeByProject
+                    })
+                });
+                const data = await response.json();
+                
+                // Monitor progress
+                const progressCheck = setInterval(async () => {
+                    const statusResponse = await fetch('/api/status');
+                    const statusData = await statusResponse.json();
+                    updateProgress(statusData.progress);
+                    
+                    if (statusData.status === 'organized' || statusData.status === 'error') {
+                        clearInterval(progressCheck);
+                        checkStatus();
+                    }
+                }, 300);
+                
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        async function findDuplicates() {
+            try {
+                const response = await fetch('/api/duplicates', { method: 'POST' });
+                const data = await response.json();
+                alert(data.message);
+                checkStatus();
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        async function reset() {
+            if (!confirm('Reset all scan results?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/reset', { method: 'POST' });
+                const data = await response.json();
+                location.reload();
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        // Directory Browser Functions
+        function showDirectoryBrowser() {
+            document.getElementById('directoryBrowserModal').style.display = 'block';
+            browserSelectedDirs = [...selectedDirectories];
+            updateBrowserSelectedDirs();
+            navigateToHome();
+        }
+
+        function hideDirectoryBrowser() {
+            document.getElementById('directoryBrowserModal').style.display = 'none';
+        }
+
+        function updateBrowserSelectedDirs() {
+            const container = document.getElementById('browserSelectedDirs');
+            if (browserSelectedDirs.length === 0) {
+                container.innerHTML = '<div style="color: #666; font-size: 0.9em;">No directories selected</div>';
+            } else {
+                container.innerHTML = browserSelectedDirs.map(dir => {
+                    const escapedDir = dir.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    return `
+                    <div class="selected-dir-tag">
+                        ${dir.replace(/</g, '&lt;').replace(/>/g, '&gt;')}
+                        <span class="remove" onclick="removeBrowserDir('${escapedDir}')">×</span>
+                    </div>
+                `;
+                }).join('');
+            }
+        }
+
+        function removeBrowserDir(dir) {
+            browserSelectedDirs = browserSelectedDirs.filter(d => d !== dir);
+            updateBrowserSelectedDirs();
+        }
+
+        function confirmDirectorySelection() {
+            selectedDirectories = [...browserSelectedDirs];
+            updateSelectedDirectories();
+            hideDirectoryBrowser();
+        }
+
+        function updateSelectedDirectories() {
+            const manualInput = document.getElementById('directories').value;
+            if (manualInput.trim()) {
+                const manualDirs = manualInput.split(/[,\n]/).map(d => d.trim()).filter(d => d);
+                selectedDirectories = [...new Set([...selectedDirectories, ...manualDirs])];
+            }
+
+            const container = document.getElementById('selectedDirectories');
+            if (selectedDirectories.length === 0) {
+                container.innerHTML = '<div style="color: #666; font-size: 0.9em;">No directories selected. Click "Browse & Select Directories" to choose.</div>';
+            } else {
+                container.innerHTML = selectedDirectories.map(dir => {
+                    const escapedDir = dir.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    return `
+                    <div class="selected-dir-tag">
+                        ${dir.replace(/</g, '&lt;').replace(/>/g, '&gt;')}
+                        <span class="remove" onclick="removeDir('${escapedDir}')">×</span>
+                    </div>
+                `;
+                }).join('');
+            }
+        }
+
+        function removeDir(dir) {
+            selectedDirectories = selectedDirectories.filter(d => d !== dir);
+            updateSelectedDirectories();
+        }
+
+        async function loadCommonDirectories() {
+            try {
+                const response = await fetch('/api/common-directories');
+                const data = await response.json();
+                if (data.success && data.directories.length > 0) {
+                    // Show common directories including external drives
+                    const items = data.directories.map(d => ({
+                        name: d.name,
+                        path: d.path,
+                        is_directory: true
+                    }));
+                    displayDirectoryItems(items, '');
+                } else {
+                    // If no common directories, navigate to /Volumes to show drives
+                    const volumesResponse = await fetch('/api/browse?path=' + encodeURIComponent('/Volumes'));
+                    const volumesData = await volumesResponse.json();
+                    if (volumesData.success) {
+                        browseDirectory('/Volumes');
+                    } else {
+                        navigateToHome();
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading common directories:', error);
+                // Try to browse /Volumes directly
+                browseDirectory('/Volumes');
+            }
+        }
+
+        async function browseDirectory(path) {
+            currentBrowsePath = path;
+            document.getElementById('currentPath').textContent = path;
+            document.getElementById('directoryBrowserContent').innerHTML = '<div class="loading"><div class="spinner"></div><div>Loading...</div></div>';
+            
+            const navigateUpBtn = document.getElementById('navigateUpBtn');
+            const homePath = await getHomePath();
+            navigateUpBtn.disabled = !path || path === '/' || path === homePath;
+
+            try {
+                const response = await fetch(`/api/browse?path=${encodeURIComponent(path)}`);
+                const data = await response.json();
+                if (data.success) {
+                    displayDirectoryItems(data.items, data.current_path);
+                    document.getElementById('currentPath').textContent = data.current_path;
+                    currentBrowsePath = data.current_path;
+                    
+                    const parentPath = data.parent_path;
+                    navigateUpBtn.disabled = !parentPath || parentPath === data.current_path;
+                } else {
+                    document.getElementById('directoryBrowserContent').innerHTML = 
+                        `<div class="message error">Error: ${data.message}</div>`;
+                }
+            } catch (error) {
+                document.getElementById('directoryBrowserContent').innerHTML = 
+                    `<div class="message error">Error loading directory: ${error.message}</div>`;
+            }
+        }
+
+        function displayDirectoryItems(items, currentPath) {
+            const container = document.getElementById('directoryBrowserContent');
+            
+            // Separate directories and files
+            const dirs = items.filter(item => item.is_directory).sort((a, b) => a.name.localeCompare(b.name));
+            const files = items.filter(item => item.is_file).sort((a, b) => a.name.localeCompare(b.name));
+            
+            let html = '';
+            
+            // Directories first
+            dirs.forEach(item => {
+                const escapedPath = item.path.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                html += `
+                    <div class="directory-item" onclick="selectDirectory('${escapedPath}')" ondblclick="browseDirectory('${escapedPath}')">
+                        <div style="display: flex; align-items: center;">
+                            <span class="directory-icon">📁</span>
+                            <span style="font-weight: 500;">${item.name.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>
+                        </div>
+                        <div style="color: #666; font-size: 0.9em;">Directory</div>
+                    </div>
+                `;
+            });
+            
+            // Files (for reference, not selectable)
+            if (files.length > 0 && files.length <= 20) {
+                files.forEach(item => {
+                    html += `
+                        <div class="directory-item" style="opacity: 0.6; cursor: default;">
+                            <div style="display: flex; align-items: center;">
+                                <span class="directory-icon">📄</span>
+                                <span>${item.name}</span>
+                            </div>
+                            <div style="color: #666; font-size: 0.9em;">${item.size_mb || 0} MB</div>
+                        </div>
+                    `;
+                });
+            }
+            
+            if (html === '') {
+                html = '<div style="text-align: center; padding: 20px; color: #666;">Empty directory</div>';
+            }
+            
+            container.innerHTML = html;
+        }
+
+        function selectDirectory(path) {
+            if (!browserSelectedDirs.includes(path)) {
+                browserSelectedDirs.push(path);
+                updateBrowserSelectedDirs();
+            }
+        }
+
+        async function navigateToHome() {
+            try {
+                // Get home directory from server
+                const response = await fetch('/api/common-directories');
+                const data = await response.json();
+                if (data.success && data.directories.length > 0) {
+                    const homeDir = data.directories.find(d => d.name === 'Home');
+                    if (homeDir) {
+                        browseDirectory(homeDir.path);
+                        return;
+                    }
+                }
+                // Fallback to /Users
+                browseDirectory('/Users');
+            } catch (error) {
+                browseDirectory('/Users');
+            }
+        }
+
+        function navigateUp() {
+            if (currentBrowsePath) {
+                const parent = Path(currentBrowsePath).parent;
+                if (parent && parent.toString() !== currentBrowsePath) {
+                    browseDirectory(parent.toString());
+                }
+            }
+        }
+
+        // Helper to get home path (simplified)
+        function Path(path) {
+            return {
+                toString: () => path,
+                parent: {
+                    toString: () => {
+                        const parts = path.split('/').filter(p => p);
+                        if (parts.length <= 1) return '/';
+                        return '/' + parts.slice(0, -1).join('/');
+                    }
+                }
+            };
+        }
+
+        // Helper function to get home path from server
+        async function getHomePath() {
+            try {
+                const response = await fetch('/api/common-directories');
+                const data = await response.json();
+                if (data.success && data.directories.length > 0) {
+                    const homeDir = data.directories.find(d => d.name === 'Home');
+                    return homeDir ? homeDir.path : '/Users';
+                }
+            } catch (error) {
+                console.error('Error getting home path:', error);
+            }
+            return '/Users';
+        }
+    </script>
+</body>
+</html>
+

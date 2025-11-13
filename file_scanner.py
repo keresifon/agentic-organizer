@@ -10,7 +10,7 @@ from datetime import datetime
 import filetype
 
 
-@dataclass
+@dataclass(frozen=True)
 class FileInfo:
     """Information about a file"""
     path: Path
