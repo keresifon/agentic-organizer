@@ -1,0 +1,34 @@
+{
+  "default_scan_directories": [
+    "Downloads",
+    "Desktop"
+  ],
+  "organize_directory": "OrganizedFiles",
+  "organize_by_date": true,
+  "organize_by_project": true,
+  "ask_confirmation": true,
+  "categories": [
+    "Documents",
+    "Images",
+    "Videos",
+    "Audio",
+    "Archives",
+    "Code",
+    "Projects",
+    "Downloads",
+    "Desktop",
+    "Spreadsheets",
+    "Presentations",
+    "PDFs",
+    "Installers",
+    "Fonts",
+    "Other"
+  ],
+  "exclude_patterns": [
+    "*.tmp",
+    "*.log",
+    ".DS_Store",
+    "Thumbs.db"
+  ]
+}
+
